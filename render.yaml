@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: gaymoggle-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: FRONTEND_URL
+        value: https://gaymoggle.vercel.app
