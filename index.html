@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Gaymoggle — Who's Gayer?</title>
   <meta name="description" content="Random 1v1 video chat. The gayer one wins."/>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏳️‍🌈</text></svg>"/>
@@ -10,208 +10,376 @@
   <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
-  <div class="scanlines"></div>
 
-  <!-- NAV -->
-  <nav class="nav">
-    <div class="nav-logo">🏳️‍🌈 GAYMOGGLE</div>
-    <div class="nav-right">
-      <span class="online-badge"><span class="online-dot"></span><span id="onlineCount">0</span> online</span>
-    </div>
-  </nav>
+<div class="scanlines"></div>
 
-  <!-- LANDING PAGE -->
-  <section id="page-landing" class="page active">
-    <div class="hero">
+<!-- ── NAV ───────────────────────────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-logo" onclick="goHome?.()">🏳️‍🌈 GAYMOGGLE</div>
+  <div class="nav-center">
+    <span class="online-pill"><span class="online-dot"></span><span class="online-count">0</span> online</span>
+  </div>
+  <div class="nav-right" id="navProfile">
+    <span class="nav-user" id="navUsername">—</span>
+    <span class="nav-gp"   id="navGP">0 GP</span>
+    <button class="nav-lb-btn" onclick="openLeaderboard()">🏆</button>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: SETUP (username) -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="page-setup" class="page active">
+  <div class="setup-wrap">
+    <div class="setup-logo">
       <h1 class="logo glitch" data-text="GAYMOGGLE">GAYMOGGLE</h1>
-      <p class="logo-sub">WHO'S GAYER?</p>
-      <p class="tagline">Random 1v1 video chat.<br>The gayer one wins.</p>
-
-      <button class="btn btn-start" id="btnStart">
-        <span>🎥 Start Chat</span>
+      <p class="logo-tagline">WHO'S GAYER?</p>
+    </div>
+    <div class="setup-card">
+      <div class="setup-emoji">🏳️‍🌈</div>
+      <h2>Create Your Account</h2>
+      <p class="setup-sub">Just pick a username. Saved on your device forever. No password. No email. Just vibes.</p>
+      <input id="usernameInput" type="text" placeholder="Enter your gay name..." maxlength="24"
+        onkeydown="if(event.key==='Enter')saveUsername()"
+        oninput="document.getElementById('usernameError').textContent=''"/>
+      <div class="input-error" id="usernameError"></div>
+      <button class="btn btn-primary" onclick="saveUsername()">
+        Let's Go 🌈
         <div class="btn-shimmer"></div>
       </button>
-
-      <div class="badges">
-        <span class="badge">🔒 Peer-to-Peer</span>
-        <span class="badge">🚫 No Recordings</span>
-        <span class="badge">🏳️‍🌈 Be Yourself</span>
-        <span class="badge">18+ Only</span>
-      </div>
-
-      <div class="how-it-works">
-        <div class="step"><div class="step-n">01</div><div class="step-icon">🎥</div><h3>Connect</h3><p>Matched instantly with a random stranger. P2P — nobody can spy on you.</p></div>
-        <div class="step"><div class="step-n">02</div><div class="step-icon">📊</div><h3>Get Scanned</h3><p>The Gay-O-Meter™ reads your face, expression, energy and outfit in real time.</p></div>
-        <div class="step"><div class="step-n">03</div><div class="step-icon">🏆</div><h3>Win</h3><p>Whoever scores higher on the Gay-O-Meter™ at the end wins. Simple.</p></div>
-      </div>
-
-      <div class="rules">
-        <span>✅ Be yourself</span>
-        <span>✅ Compliments mandatory</span>
-        <span>❌ No harassment</span>
-        <span>❌ No nudity</span>
-        <span>❌ Must be 18+</span>
-      </div>
-
-      <footer class="landing-footer">
-        <p>Original idea by <strong>Or Brami</strong> 🌈 &nbsp;·&nbsp; Peer-to-peer video &nbsp;·&nbsp; No logs &nbsp;·&nbsp; <a href="privacy.html">Privacy</a></p>
-      </footer>
+      <p class="setup-note">18+ only · Peer-to-peer video · No recordings</p>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- CHAT PAGE -->
-  <section id="page-chat" class="page">
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: HOME -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="page-home" class="page">
+  <div class="home-wrap">
 
-    <!-- Status bar -->
-    <div class="status-bar">
-      <span class="status-dot-wrap"><span class="sdot" id="statusDot"></span><span id="statusText">Connecting...</span></span>
-      <span id="callTimer" class="call-timer"></span>
-      <span class="online-sm"><span class="online-dot"></span><span id="onlineCountChat">0</span></span>
+    <div class="home-hero">
+      <h1 class="logo glitch" data-text="GAYMOGGLE">GAYMOGGLE</h1>
+      <p class="logo-tagline">WHO'S GAYER?</p>
+      <p class="home-sub">Random 1v1 video. 30 seconds. The gayer one wins.</p>
     </div>
 
-    <div class="chat-layout">
-
-      <!-- Videos -->
-      <div class="videos">
-
-        <!-- Stranger -->
-        <div class="video-wrap stranger-wrap">
-          <video id="strangerVideo" autoplay playsinline></video>
-          <div class="video-overlay" id="strangerOverlay">
-            <div class="searching-anim">
-              <div class="searching-emoji" id="searchEmoji">🔍</div>
-              <div class="searching-text" id="searchText">Finding match...</div>
-              <div class="dots"><span></span><span></span><span></span></div>
-            </div>
-          </div>
-          <div class="vid-label">STRANGER</div>
-          <div class="gaymeter-wrap">
-            <div class="gaymeter-label">Gay-O-Meter™</div>
-            <div class="gaymeter-track"><div class="gaymeter-fill" id="strangerMeterFill"></div></div>
-            <div class="gaymeter-score" id="strangerMeterScore">—</div>
-          </div>
-          <button class="report-btn" onclick="reportUser()">⚑</button>
-        </div>
-
-        <!-- You -->
-        <div class="video-wrap you-wrap">
-          <!-- mirror transform applied via CSS -->
-          <video id="localVideo" autoplay playsinline muted></video>
-          <div class="video-overlay hidden" id="youOverlay">
-            <div class="searching-emoji">😎</div>
-          </div>
-          <div class="vid-label you-vid-label">YOU</div>
-          <div class="gaymeter-wrap">
-            <div class="gaymeter-label">Your Score</div>
-            <div class="gaymeter-track"><div class="gaymeter-fill" id="youMeterFill"></div></div>
-            <div class="gaymeter-score" id="youMeterScore">—</div>
-          </div>
-          <!-- Video filters -->
-          <div class="filter-row">
-            <button class="fbtn active" data-f="none"    onclick="setFilter('none',this)">Normal</button>
-            <button class="fbtn"        data-f="mirror"  onclick="setFilter('mirror',this)">🪞</button>
-            <button class="fbtn"        data-f="rainbow" onclick="setFilter('rainbow',this)">🌈</button>
-            <button class="fbtn"        data-f="glam"    onclick="setFilter('glam',this)">✨</button>
-          </div>
-        </div>
-
-      </div><!-- /videos -->
-
-      <!-- Right panel -->
-      <div class="right-panel">
-
-        <!-- Icebreaker -->
-        <div class="icebreaker">
-          <div class="ib-tag">💬 ICE BREAKER</div>
-          <div class="ib-text" id="ibText">Loading...</div>
-          <button class="ib-next" onclick="nextIcebreaker()">Next →</button>
-        </div>
-
-        <!-- Messages -->
-        <div class="messages" id="messages">
-          <div class="sys-msg">🏳️‍🌈 Welcome. Be iconic.</div>
-        </div>
-
-        <!-- Input -->
-        <div class="msg-input-row">
-          <input id="msgInput" type="text" placeholder="Say something iconic..." maxlength="200"/>
-          <button onclick="sendMessage()">Send</button>
-        </div>
-
-        <!-- Reactions -->
-        <div class="reactions">
-          <button onclick="sendReaction('🌈')">🌈</button>
-          <button onclick="sendReaction('💅')">💅</button>
-          <button onclick="sendReaction('👑')">👑</button>
-          <button onclick="sendReaction('💀')">💀</button>
-          <button onclick="sendReaction('🔥')">🔥</button>
-          <button onclick="sendReaction('👏')">👏</button>
-        </div>
-
-        <!-- Controls -->
-        <div class="controls">
-          <button class="ctrl-skip" onclick="skip()">⏭ Skip</button>
-          <button class="ctrl-end"  onclick="endAndRate()">🏁 End &amp; Rate</button>
-        </div>
-
-      </div><!-- /right-panel -->
-    </div><!-- /chat-layout -->
-
-  </section><!-- /page-chat -->
-
-  <!-- RESULTS PAGE -->
-  <section id="page-results" class="page">
-    <div class="results-wrap">
-      <div class="result-crown" id="resultCrown">👑</div>
-      <div class="result-headline" id="resultHeadline">YOU WIN!</div>
-      <div class="result-sub" id="resultSub"></div>
-
-      <div class="score-cards">
-        <div class="score-card you-card">
-          <div class="sc-label">YOU</div>
-          <div class="sc-num" id="yourScoreDisp">—</div>
-          <div class="sc-bar-wrap"><div class="sc-bar" id="yourBar"></div></div>
-          <div class="sc-tag" id="yourTag">—</div>
-        </div>
-        <div class="score-vs">VS</div>
-        <div class="score-card stranger-card">
-          <div class="sc-label">STRANGER</div>
-          <div class="sc-num" id="strangerScoreDisp">—</div>
-          <div class="sc-bar-wrap"><div class="sc-bar stranger-bar" id="strangerBar"></div></div>
-          <div class="sc-tag" id="strangerTag">—</div>
+    <!-- Profile card -->
+    <div class="profile-card">
+      <div class="pc-avatar">😎</div>
+      <div class="pc-info">
+        <div class="pc-name display-username">—</div>
+        <div class="pc-stats">
+          <span>⭐ <span class="display-gp">0</span> GP total</span>
+          <span>🏆 <span class="display-season-gp">0</span> this season</span>
+          <span>🏅 <span class="display-wins">0</span> wins</span>
+          <span>🔥 <span class="display-streak">0</span> streak</span>
         </div>
       </div>
-
-      <div class="result-actions">
-        <button class="btn btn-start" onclick="playAgain()">🔁 Play Again</button>
-        <button class="btn btn-share" onclick="shareResult()">🐦 Share</button>
-      </div>
-
-      <p class="result-credit">Original idea by <strong>Or Brami</strong> 🌈</p>
     </div>
-  </section>
 
-  <!-- REPORT MODAL -->
-  <div class="modal-backdrop hidden" id="reportBackdrop">
-    <div class="modal">
-      <h3>Report This Person</h3>
-      <div class="report-opts">
-        <button onclick="submitReport('Harassment')">😤 Harassment</button>
-        <button onclick="submitReport('Inappropriate content')">🚫 Inappropriate Content</button>
-        <button onclick="submitReport('Underage')">🔞 Underage</button>
-        <button onclick="submitReport('Other')">❓ Other</button>
+    <!-- Action buttons -->
+    <div class="home-actions">
+      <button class="btn btn-primary btn-big" onclick="startRandom()">
+        🎥 Random Match
+        <div class="btn-shimmer"></div>
+      </button>
+      <button class="btn btn-secondary btn-big" onclick="showPrivatePanel()">
+        🔐 Private Match
+      </button>
+      <button class="btn btn-outline btn-big" onclick="openLeaderboard()">
+        🏆 Leaderboard
+      </button>
+    </div>
+
+    <!-- Private match panel (inline) -->
+    <div class="private-panel hidden" id="privatePanel">
+      <div class="pp-card">
+        <h3>Private 1v1</h3>
+        <div class="pp-row">
+          <button class="btn btn-secondary" onclick="createPrivateRoom()">🏠 Create Room</button>
+          <span class="pp-or">or</span>
+          <div class="pp-join">
+            <input id="joinCodeInput" type="text" placeholder="Enter code..." maxlength="5"
+              style="text-transform:uppercase"/>
+            <button class="btn btn-outline" onclick="joinRoom()">Join →</button>
+          </div>
+        </div>
+        <div class="input-error" id="joinError"></div>
       </div>
-      <button class="modal-cancel" onclick="closeReport()">Cancel</button>
+    </div>
+
+    <!-- How it works -->
+    <div class="how-grid">
+      <div class="how-item"><span>🎥</span><p>Match with a random stranger</p></div>
+      <div class="how-item"><span>📊</span><p>30-second Gay-O-Meter™ scan</p></div>
+      <div class="how-item"><span>⚡</span><p>Overtime if scores are tied</p></div>
+      <div class="how-item"><span>🏆</span><p>Winner gets Gay Points™</p></div>
+    </div>
+
+    <footer class="home-footer">
+      Original idea by <strong>Or Brami</strong> 🌈 &nbsp;·&nbsp;
+      Peer-to-peer video &nbsp;·&nbsp; No recordings &nbsp;·&nbsp;
+      <a href="privacy.html">Privacy</a>
+    </footer>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: CHAT -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="page-chat" class="page">
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span class="status-left"><span class="sdot" id="statusDot"></span><span id="statusText">Connecting...</span></span>
+    <span id="callTimer" class="call-timer"></span>
+    <span class="online-pill sm"><span class="online-dot"></span><span class="online-count">0</span></span>
+  </div>
+
+  <!-- Private room waiting overlay -->
+  <div class="room-waiting hidden" id="privateRoomWaiting">
+    <div class="rw-inner">
+      <div class="rw-emoji">🔐</div>
+      <h3>Room Created!</h3>
+      <div class="rw-code" id="roomCodeDisplay">—</div>
+      <p>Share this code with your friend</p>
+      <button class="btn btn-outline" id="copyCodeBtn">📋 Copy Code</button>
+      <p class="rw-waiting">Waiting for them to join...</p>
+      <div class="dots"><span></span><span></span><span></span></div>
     </div>
   </div>
 
-  <!-- Socket.io from your Render backend -->
-  <!-- IMPORTANT: Replace RENDER_URL below with your actual Render URL after deploying -->
-  <script src="js/config.js"></script>
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <!-- face-api.js for real face analysis -->
-  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script>
-  <script src="js/gayometer.js"></script>
-  <script src="js/app.js"></script>
+  <!-- Overtime banner -->
+  <div class="overtime-banner hidden" id="overtimeBanner">⚡ OVERTIME! Scores too close! ⚡</div>
+  <div class="overtime-warning hidden" id="overtimeWarning">⏰ Almost tied... overtime incoming!</div>
+
+  <div class="chat-layout">
+
+    <!-- ── VIDEOS ── -->
+    <div class="videos-col">
+
+      <!-- Stranger video -->
+      <div class="video-wrap stranger-wrap" id="strangerVideoWrap">
+        <video id="strangerVideo" autoplay playsinline></video>
+        <div class="video-overlay" id="strangerOverlay">
+          <div class="sv-emoji">🔍</div>
+          <div class="sv-text" id="searchText">Finding match...</div>
+          <div class="dots"><span></span><span></span><span></span></div>
+        </div>
+        <div class="vid-label">STRANGER</div>
+        <div class="stranger-name-tag" id="strangerNameDisplay">Stranger</div>
+        <div class="gaymeter-wrap">
+          <div class="gm-label">Gay-O-Meter™</div>
+          <div class="gm-track"><div class="gm-fill" id="strangerMeterFill"></div></div>
+          <div class="gm-score" id="strangerMeterScore">—</div>
+        </div>
+        <button class="report-btn" onclick="reportUser()">⚑</button>
+      </div>
+
+      <!-- Your video -->
+      <div class="video-wrap you-wrap">
+        <!-- Mirror applied via CSS transform -->
+        <video id="localVideo" autoplay playsinline muted></video>
+        <!-- Landmark dots overlay -->
+        <canvas id="youDotCanvas" class="dot-canvas"></canvas>
+        <div class="video-overlay hidden" id="youOverlay">
+          <div class="sv-emoji">😎</div>
+        </div>
+        <div class="vid-label you-label">YOU</div>
+        <div class="gaymeter-wrap">
+          <div class="gm-label">Your Score</div>
+          <div class="gm-track"><div class="gm-fill" id="youMeterFill"></div></div>
+          <div class="gm-score" id="youMeterScore">—</div>
+        </div>
+        <div class="filter-row">
+          <button class="fbtn active" data-f="none"    onclick="setFilter('none',this)">Normal</button>
+          <button class="fbtn"        data-f="rainbow" onclick="setFilter('rainbow',this)">🌈</button>
+          <button class="fbtn"        data-f="glam"    onclick="setFilter('glam',this)">✨</button>
+          <button class="fbtn"        data-f="bw"      onclick="setFilter('bw',this)">🖤</button>
+        </div>
+      </div>
+
+      <!-- Countdown -->
+      <div class="countdown-row">
+        <div class="match-countdown" id="matchCountdown">30</div>
+        <div class="countdown-label">seconds left</div>
+      </div>
+
+    </div><!-- /videos-col -->
+
+    <!-- ── RIGHT PANEL ── -->
+    <div class="right-panel">
+      <div class="icebreaker">
+        <div class="ib-tag">💬 ICE BREAKER</div>
+        <div class="ib-text" id="ibText"></div>
+        <button class="ib-next" onclick="nextIcebreaker()">Next →</button>
+      </div>
+
+      <div class="messages" id="messages">
+        <div class="sys-msg">🏳️‍🌈 Welcome. Be iconic.</div>
+      </div>
+
+      <div class="msg-input-row">
+        <input id="msgInput" type="text" placeholder="Say something..." maxlength="200"/>
+        <button onclick="sendMessage()">Send</button>
+      </div>
+
+      <div class="reactions">
+        <button onclick="sendReaction('🌈')">🌈</button>
+        <button onclick="sendReaction('💅')">💅</button>
+        <button onclick="sendReaction('👑')">👑</button>
+        <button onclick="sendReaction('💀')">💀</button>
+        <button onclick="sendReaction('🔥')">🔥</button>
+        <button onclick="sendReaction('👏')">👏</button>
+      </div>
+
+      <div class="controls">
+        <button class="ctrl-skip" onclick="skip()">⏭ Skip</button>
+        <button class="ctrl-end"  onclick="endAndRate()">🏁 End & Rate</button>
+      </div>
+    </div>
+
+  </div><!-- /chat-layout -->
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: RESULTS -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="page-results" class="page">
+  <div class="results-wrap">
+
+    <!-- Achievement toast -->
+    <div class="achievement-toast hidden" id="achievementToast">
+      🏅 Achievement Unlocked: <span id="newAchievement"></span>
+    </div>
+
+    <div class="result-top">
+      <div class="result-crown" id="resultCrown">👑</div>
+      <h1 class="result-headline" id="resultHeadline">YOU WIN!</h1>
+      <p class="result-sub" id="resultSubLine"></p>
+      <p class="result-vs" id="resultVsName"></p>
+    </div>
+
+    <!-- Score comparison -->
+    <div class="score-compare">
+      <div class="sc-card you-sc">
+        <div class="sc-label">YOU</div>
+        <div class="sc-num" id="resultYouScore">—</div>
+        <div class="sc-bar-wrap"><div class="sc-bar" id="resultYouBar"></div></div>
+        <div class="sc-tag" id="resultYouLabel">—</div>
+      </div>
+      <div class="sc-mid">VS</div>
+      <div class="sc-card them-sc">
+        <div class="sc-label">STRANGER</div>
+        <div class="sc-num them-num" id="resultStrangerScore">—</div>
+        <div class="sc-bar-wrap"><div class="sc-bar them-bar" id="resultStrangerBar"></div></div>
+        <div class="sc-tag" id="resultStrangerLabel">—</div>
+      </div>
+    </div>
+
+    <!-- GP earned -->
+    <div class="gp-earned">
+      <span class="gpe-label">Gay Points™ earned:</span>
+      <span class="gpe-num" id="resultGPEarned">+0</span>
+    </div>
+
+    <!-- Rematch prompt (incoming) -->
+    <div class="rematch-prompt hidden" id="rematchPrompt">
+      <span>🔁 Stranger wants a rematch!</span>
+      <div class="rp-btns">
+        <button class="btn btn-primary btn-sm" onclick="acceptRematch()">Accept</button>
+        <button class="btn btn-outline btn-sm" onclick="declineRematch()">Decline</button>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="result-actions">
+      <button class="btn btn-primary" id="rematchBtn" onclick="requestRematch()">🔁 Rematch</button>
+      <button class="btn btn-secondary" onclick="playAgainRandom()">🎲 New Match</button>
+      <button class="btn btn-outline" onclick="goHome()">🏠 Home</button>
+    </div>
+    <div class="result-actions" style="margin-top:.5rem">
+      <button class="btn btn-save" onclick="saveResultPhoto()">📸 Save Photo</button>
+      <button class="btn btn-share" onclick="shareResult()">🐦 Share</button>
+      <button class="btn btn-outline" onclick="openLeaderboard()">🏆 Leaderboard</button>
+    </div>
+
+    <p class="result-credit">Original idea by <strong>Or Brami</strong> 🌈</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: LEADERBOARD -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="page-leaderboard" class="page">
+  <div class="lb-wrap">
+
+    <div class="lb-header">
+      <button class="back-btn" onclick="showPage('page-home');updateProfileDisplay()">← Back</button>
+      <h1 class="lb-title">🏆 Gay Leaderboard</h1>
+      <p class="lb-sub">Season resets every 10 days. Points earned by playing.</p>
+    </div>
+
+    <!-- Season countdown -->
+    <div class="season-card">
+      <div class="sc-tag-label">CURRENT SEASON ENDS IN</div>
+      <div class="season-timer" id="seasonTimer">—</div>
+      <div class="season-note">Win matches to earn Gay Points™ and climb the ranks</div>
+    </div>
+
+    <!-- Podium (top 3) -->
+    <div class="podium" id="lbPodium"></div>
+
+    <!-- Full leaderboard -->
+    <div class="lb-full">
+      <div class="lb-cols-header">
+        <span>Rank</span><span>Player</span><span>Season GP</span><span>Wins</span><span>Streak</span>
+      </div>
+      <div id="lbList"></div>
+    </div>
+
+    <!-- Your stats -->
+    <div class="my-stats-card">
+      <h3>Your Stats</h3>
+      <div class="my-stats-grid">
+        <div><span class="msc-val display-gp">0</span><span class="msc-label">Total GP</span></div>
+        <div><span class="msc-val display-season-gp">0</span><span class="msc-label">Season GP</span></div>
+        <div><span class="msc-val display-wins">0</span><span class="msc-label">Wins</span></div>
+        <div><span class="msc-val display-streak">0</span><span class="msc-label">Streak 🔥</span></div>
+      </div>
+    </div>
+
+    <!-- Achievements -->
+    <div class="ach-section">
+      <h3>Achievements</h3>
+      <div class="ach-grid" id="achGrid"></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── REPORT MODAL ─────────────────────────────────────────────────────── -->
+<div class="modal-backdrop hidden" id="reportBackdrop">
+  <div class="modal">
+    <h3>Report</h3>
+    <div class="report-opts">
+      <button onclick="submitReport('Harassment')">😤 Harassment</button>
+      <button onclick="submitReport('Inappropriate content')">🚫 Inappropriate</button>
+      <button onclick="submitReport('Underage')">🔞 Underage</button>
+      <button onclick="submitReport('Other')">❓ Other</button>
+    </div>
+    <button class="modal-cancel" onclick="closeReport()">Cancel</button>
+  </div>
+</div>
+
+<!-- ── SCRIPTS ──────────────────────────────────────────────────────────── -->
+<script src="js/config.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/gayometer.js"></script>
+<script src="js/app.js"></script>
+
 </body>
 </html>
