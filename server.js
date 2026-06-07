@@ -1,229 +1,200 @@
 /**
- * GAYMOGGLE — Signaling + Matchmaking Server
- *
- * What this does:
- *  - Keeps a waiting queue of users looking for a match
- *  - When two users are available, pairs them and tells each
- *    other's socket IDs so WebRTC can connect directly
- *  - Relays WebRTC offer/answer/ICE candidates between peers
- *  - Handles disconnects cleanly (notifies the partner)
- *  - Tracks real online count and broadcasts it
- *
- * Video/audio NEVER touches this server.
- * It's purely a matchmaking + signaling coordinator.
+ * GAYMOGGLE v3 — Signaling + Matchmaking + Private Rooms
  */
-
-const express   = require('express');
-const http      = require('http');
+const express    = require('express');
+const http       = require('http');
 const { Server } = require('socket.io');
-const cors      = require('cors');
+const cors       = require('cors');
 
 const app    = express();
 const server = http.createServer(app);
-
-// ---- CORS: allow your Vercel frontend ----
-// During setup set FRONTEND_URL env var on Render to your Vercel URL
-// e.g. https://gaymoggle.vercel.app
-const FRONTEND_URL = process.env.FRONTEND_URL || '*';
+const FRONTEND = process.env.FRONTEND_URL || '*';
 
 const io = new Server(server, {
-  cors: {
-    origin: FRONTEND_URL,
-    methods: ['GET', 'POST'],
-  },
-  pingTimeout:  30000,
-  pingInterval: 10000,
+  cors: { origin: FRONTEND, methods: ['GET','POST'] },
+  pingTimeout: 30000, pingInterval: 10000,
 });
 
-app.use(cors({ origin: FRONTEND_URL }));
-app.use(express.json());
+app.use(cors({ origin: FRONTEND }));
+app.get('/',       (_, res) => res.json({ status: 'ok', online: users.size }));
+app.get('/health', (_, res) => res.json({ status: 'ok', online: users.size, waiting: queue.length, rooms: privateRooms.size }));
 
-// Health check — Render pings this to keep the server alive
-app.get('/',        (req, res) => res.send('Gaymoggle signaling server running 🌈'));
-app.get('/health',  (req, res) => res.json({ status: 'ok', online: connectedUsers.size, waiting: waitingQueue.length }));
+// ── State ──────────────────────────────────────────────────────────────────
+const users        = new Map(); // socketId → { socketId, partnerId, username, roomCode }
+const queue        = [];        // socketIds waiting for random match
+const privateRooms = new Map(); // roomCode → { creator: socketId, joiner: socketId|null }
+const rematchOffers= new Map(); // socketId → partnerSocketId they want to rematch
 
-// ---- State ----
-const connectedUsers = new Map();
-// Map<socketId, { socketId, partnerId|null, inCall }>
+function broadcast() { io.emit('online_count', users.size); }
+function rmQueue(id) { const i = queue.indexOf(id); if (i !== -1) queue.splice(i,1); }
 
-const waitingQueue = [];
-// Array of socketIds waiting to be matched
-
-// ---- Helpers ----
-function getOnlineCount() {
-  return connectedUsers.size;
-}
-
-function broadcastOnlineCount() {
-  io.emit('online_count', getOnlineCount());
-}
-
-function removeFromQueue(socketId) {
-  const idx = waitingQueue.indexOf(socketId);
-  if (idx !== -1) waitingQueue.splice(idx, 1);
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
 }
 
 function tryMatch() {
-  // Remove any queued users who are no longer connected
-  for (let i = waitingQueue.length - 1; i >= 0; i--) {
-    if (!connectedUsers.has(waitingQueue[i])) {
-      waitingQueue.splice(i, 1);
-    }
+  // Purge disconnected
+  for (let i = queue.length - 1; i >= 0; i--) {
+    if (!users.has(queue[i])) queue.splice(i, 1);
   }
-
-  while (waitingQueue.length >= 2) {
-    const idA = waitingQueue.shift();
-    const idB = waitingQueue.shift();
-
-    const userA = connectedUsers.get(idA);
-    const userB = connectedUsers.get(idB);
-
-    if (!userA || !userB) {
-      // One disappeared — put the survivor back
-      if (userA) waitingQueue.unshift(idA);
-      if (userB) waitingQueue.unshift(idB);
-      continue;
-    }
-
-    // Pair them
-    userA.partnerId = idB;
-    userB.partnerId = idA;
-    userA.inCall    = true;
-    userB.inCall    = true;
-
-    // Tell A: you are the CALLER (you send the WebRTC offer)
-    io.to(idA).emit('matched', { partnerId: idB, role: 'caller' });
-    // Tell B: you are the CALLEE (you wait for the offer, then answer)
-    io.to(idB).emit('matched', { partnerId: idA, role: 'callee' });
-
-    console.log(`Matched: ${idA.slice(0,6)} ↔ ${idB.slice(0,6)}`);
+  while (queue.length >= 2) {
+    const idA = queue.shift();
+    const idB = queue.shift();
+    const uA  = users.get(idA);
+    const uB  = users.get(idB);
+    if (!uA || !uB) { if (uA) queue.unshift(idA); if (uB) queue.unshift(idB); continue; }
+    pair(idA, idB, 'random');
   }
 }
 
-// ---- Socket.io events ----
-io.on('connection', (socket) => {
-  console.log(`+ Connected: ${socket.id.slice(0,8)}`);
+function pair(idA, idB, mode) {
+  const uA = users.get(idA);
+  const uB = users.get(idB);
+  if (!uA || !uB) return;
+  uA.partnerId = idB;
+  uB.partnerId = idA;
+  io.to(idA).emit('matched', { partnerId: idB, partnerName: uB.username, role: 'caller',  mode });
+  io.to(idB).emit('matched', { partnerId: idA, partnerName: uA.username, role: 'callee',  mode });
+  console.log(`Paired [${mode}]: ${idA.slice(0,6)} ↔ ${idB.slice(0,6)}`);
+}
 
-  connectedUsers.set(socket.id, {
-    socketId:  socket.id,
-    partnerId: null,
-    inCall:    false,
+function handleLeave(socket) {
+  const u = users.get(socket.id);
+  if (!u) return;
+  if (u.partnerId) {
+    io.to(u.partnerId).emit('partner_left');
+    const partner = users.get(u.partnerId);
+    if (partner) partner.partnerId = null;
+  }
+  u.partnerId = null;
+  // Clean up any private room they created
+  if (u.roomCode) {
+    privateRooms.delete(u.roomCode);
+    u.roomCode = null;
+  }
+}
+
+// ── Socket events ──────────────────────────────────────────────────────────
+io.on('connection', socket => {
+  console.log(`+ ${socket.id.slice(0,8)}`);
+  users.set(socket.id, { socketId: socket.id, partnerId: null, username: 'Anonymous', roomCode: null });
+  broadcast();
+
+  socket.on('set_username', ({ username }) => {
+    const u = users.get(socket.id);
+    if (u && typeof username === 'string') u.username = username.slice(0, 24);
   });
 
-  broadcastOnlineCount();
-
-  // --- User is ready to be matched ---
   socket.on('find_match', () => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-
-    // Make sure they're not already queued or in a call
-    removeFromQueue(socket.id);
-    user.partnerId = null;
-    user.inCall    = false;
-
-    waitingQueue.push(socket.id);
+    const u = users.get(socket.id);
+    if (!u) return;
+    handleLeave(socket);
+    rmQueue(socket.id);
+    queue.push(socket.id);
     socket.emit('waiting');
-    console.log(`Queued: ${socket.id.slice(0,8)} | Queue length: ${waitingQueue.length}`);
     tryMatch();
   });
 
-  // --- WebRTC signaling relay ---
-  // Caller sends offer → server forwards to callee
-  socket.on('webrtc_offer', ({ offer }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user || !user.partnerId) return;
-    io.to(user.partnerId).emit('webrtc_offer', { offer, from: socket.id });
+  // ── Private room ──
+  socket.on('create_room', () => {
+    const u = users.get(socket.id);
+    if (!u) return;
+    handleLeave(socket);
+    rmQueue(socket.id);
+    // Make unique code
+    let code;
+    do { code = generateRoomCode(); } while (privateRooms.has(code));
+    privateRooms.set(code, { creator: socket.id, joiner: null });
+    u.roomCode = code;
+    socket.emit('room_created', { code });
   });
 
-  // Callee sends answer → server forwards to caller
-  socket.on('webrtc_answer', ({ answer }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user || !user.partnerId) return;
-    io.to(user.partnerId).emit('webrtc_answer', { answer });
+  socket.on('join_room', ({ code }) => {
+    const u    = users.get(socket.id);
+    const room = privateRooms.get(code?.toUpperCase().trim());
+    if (!u || !room) { socket.emit('room_error', { msg: 'Room not found. Check the code.' }); return; }
+    if (room.joiner)  { socket.emit('room_error', { msg: 'Room is full.' }); return; }
+    if (room.creator === socket.id) { socket.emit('room_error', { msg: "You can't join your own room." }); return; }
+    handleLeave(socket);
+    rmQueue(socket.id);
+    room.joiner = socket.id;
+    privateRooms.delete(code.toUpperCase().trim());
+    const creator = users.get(room.creator);
+    if (creator) creator.roomCode = null;
+    pair(room.creator, socket.id, 'private');
   });
 
-  // ICE candidates — relay to partner
-  socket.on('ice_candidate', ({ candidate }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user || !user.partnerId) return;
-    io.to(user.partnerId).emit('ice_candidate', { candidate });
-  });
+  // ── WebRTC relay ──
+  socket.on('webrtc_offer',     ({ offer })     => { const u = users.get(socket.id); if (u?.partnerId) io.to(u.partnerId).emit('webrtc_offer',    { offer }); });
+  socket.on('webrtc_answer',    ({ answer })    => { const u = users.get(socket.id); if (u?.partnerId) io.to(u.partnerId).emit('webrtc_answer',   { answer }); });
+  socket.on('ice_candidate',    ({ candidate }) => { const u = users.get(socket.id); if (u?.partnerId) io.to(u.partnerId).emit('ice_candidate',   { candidate }); });
 
-  // --- Text chat relay ---
+  // ── Chat ──
   socket.on('chat_message', ({ text }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user || !user.partnerId) return;
-    if (typeof text !== 'string' || text.length > 300) return;
-    io.to(user.partnerId).emit('chat_message', { text });
+    const u = users.get(socket.id);
+    if (!u?.partnerId || typeof text !== 'string') return;
+    io.to(u.partnerId).emit('chat_message', { text: text.slice(0,300) });
   });
-
   socket.on('chat_reaction', ({ emoji }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user || !user.partnerId) return;
-    const allowed = ['🌈','💅','👑','💀','🔥','👏','😍','💃','✨','🎉'];
-    if (!allowed.includes(emoji)) return;
-    io.to(user.partnerId).emit('chat_reaction', { emoji });
+    const u = users.get(socket.id);
+    if (!u?.partnerId) return;
+    const ok = ['🌈','💅','👑','💀','🔥','👏','😍','✨','🎉','💃'];
+    if (ok.includes(emoji)) io.to(u.partnerId).emit('chat_reaction', { emoji });
   });
 
-  // Gay score sharing (for stranger's meter display)
+  // Gay score sharing
   socket.on('gay_score', ({ score }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user || !user.partnerId) return;
-    const s = Math.max(0, Math.min(10, parseFloat(score) || 5));
-    io.to(user.partnerId).emit('gay_score', { score: s });
+    const u = users.get(socket.id);
+    if (!u?.partnerId) return;
+    io.to(u.partnerId).emit('gay_score', { score: Math.max(0, Math.min(10, parseFloat(score)||5)) });
   });
 
-  // --- Skip / leave call ---
+  // ── Rematch ──
+  socket.on('request_rematch', () => {
+    const u = users.get(socket.id);
+    if (!u?.partnerId) return;
+    const partnerId = u.partnerId;
+    rematchOffers.set(socket.id, partnerId);
+    io.to(partnerId).emit('rematch_requested');
+    // Check if both want rematch
+    if (rematchOffers.get(partnerId) === socket.id) {
+      rematchOffers.delete(socket.id);
+      rematchOffers.delete(partnerId);
+      // Reset partner state but keep them paired — re-match
+      const uP = users.get(partnerId);
+      if (uP) {
+        pair(socket.id, partnerId, 'rematch');
+      }
+    }
+  });
+
+  socket.on('decline_rematch', () => {
+    const u = users.get(socket.id);
+    if (!u?.partnerId) return;
+    rematchOffers.delete(u.partnerId);
+    io.to(u.partnerId).emit('rematch_declined');
+  });
+
+  // ── Skip / Leave ──
   socket.on('skip', () => {
     handleLeave(socket);
-    // Put them back in queue
-    const user = connectedUsers.get(socket.id);
-    if (user) {
-      user.partnerId = null;
-      user.inCall    = false;
-      waitingQueue.push(socket.id);
-      socket.emit('waiting');
-      tryMatch();
-    }
+    const u = users.get(socket.id);
+    if (u) { queue.push(socket.id); socket.emit('waiting'); tryMatch(); }
   });
+  socket.on('leave', () => handleLeave(socket));
 
-  socket.on('leave', () => {
-    handleLeave(socket);
-  });
-
-  // --- Disconnect ---
   socket.on('disconnect', () => {
-    console.log(`- Disconnected: ${socket.id.slice(0,8)}`);
+    console.log(`- ${socket.id.slice(0,8)}`);
     handleLeave(socket);
-    removeFromQueue(socket.id);
-    connectedUsers.delete(socket.id);
-    broadcastOnlineCount();
+    rmQueue(socket.id);
+    rematchOffers.delete(socket.id);
+    users.delete(socket.id);
+    broadcast();
   });
 });
 
-function handleLeave(socket) {
-  const user = connectedUsers.get(socket.id);
-  if (!user) return;
-
-  if (user.partnerId) {
-    // Notify partner
-    io.to(user.partnerId).emit('partner_left');
-
-    // Put partner back in queue
-    const partner = connectedUsers.get(user.partnerId);
-    if (partner) {
-      partner.partnerId = null;
-      partner.inCall    = false;
-    }
-  }
-
-  user.partnerId = null;
-  user.inCall    = false;
-}
-
-// ---- Start ----
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`🌈 Gaymoggle server running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`🌈 Gaymoggle v3 on :${PORT}`));
